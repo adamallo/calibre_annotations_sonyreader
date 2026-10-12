@@ -93,6 +93,30 @@ class SonyReaderTests(unittest.TestCase):
         self.reader.update_timestamp.assert_called_once_with('annotations')
         self.reader.commit.assert_called_once_with()
 
+    def test_location_sort_survives_database_storage(self):
+        self.conn.executemany('INSERT INTO annotation VALUES (?, ?, ?, ?, ?, ?)', [
+            (1, 7, 1600000000000, 'Page twelve', '', 12),
+            (2, 7, 1600000001000, 'Page three', '', 3),
+            (3, 7, 1600000002000, 'Unknown page', '', None),
+            (4, 7, 1600000003000, 'Page three again', '', 3),
+            (5, 7, 1600000004000, 'Page zero', '', 0),
+        ])
+        self.fetch('get_active_annotations')
+        annotations = [call.args[1]
+                       for call in self.reader.add_to_annotations_db.call_args_list]
+        # Match the plugin's TEXT column and its location_sort ordering.
+        with contextlib.closing(sqlite3.connect(':memory:')) as db:
+            db.execute('CREATE TABLE rendered (text TEXT, location TEXT, location_sort TEXT)')
+            db.executemany('INSERT INTO rendered VALUES (?, ?, ?)', [
+                (ann.highlight_text, ann.location, ann.location_sort) for ann in annotations
+            ])
+            rows = sorted(db.execute('SELECT * FROM rendered'), key=lambda row: row[2])
+        self.assertEqual([row[0] for row in rows], [
+            'Unknown page', 'Page zero', 'Page three', 'Page three again', 'Page twelve'
+        ])
+        self.assertEqual([row[1] for row in rows], ['', 'p. 0', 'p. 3', 'p. 3', 'p. 12'])
+        self.assertTrue(all(isinstance(row[2], str) for row in rows))
+
     def test_empty_annotation_database(self):
         self.fetch('get_active_annotations')
         self.reader.add_to_annotations_db.assert_not_called()

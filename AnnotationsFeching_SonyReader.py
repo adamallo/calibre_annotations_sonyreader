@@ -183,9 +183,15 @@ class SonyReaderApp(USBReader):
                     ann_mi.note_text = note_text
                 else:
                     ann_mi.note_text = ''
+            # The Annotations renderer sorts by this TEXT field, not location.
+            ann_mi.location = ''
+            ann_mi.location_sort = ''
             if 'location' in dict_of_anns[timestamp]:
-                ann_mi.location = str(int(next(iter(dict_of_anns[timestamp]['location'] or []), None)))
-                ann_mi.location = ('p. '+ann_mi.location) if ann_mi.location != None else ''
+                page = next(iter(dict_of_anns[timestamp]['location'] or []), None)
+                if page is not None:
+                    page = int(page)
+                    ann_mi.location = 'p. %d' % page
+                    ann_mi.location_sort = '%020d' % page
 
             # Add annotation to annotations_db
             self.add_to_annotations_db(annotations_db, ann_mi)
