@@ -161,7 +161,7 @@ class SonyReaderApp(USBReader):
         self.opts.pb.set_maximum(len(dict_of_anns))
 
         # Add annotations to the database
-        for timestamp in sorted(dict_of_anns.iterkeys()):
+        for timestamp in sorted(dict_of_anns):
             # Populate an AnnotationStruct with available data
             ann_mi = AnnotationStruct()
 
