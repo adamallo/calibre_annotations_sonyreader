@@ -41,6 +41,12 @@ class SonyReaderApp(USBReader):
 
 
 
+    @staticmethod
+    def _device_book_id(book_id):
+        # Numeric IDs are treated as calibre library IDs by generate_confidence.
+        # Sony's IDs belong to a separate database; preserve that distinction.
+        return 'sony:%d' % int(book_id)
+
     def _get_db(self):
         self.device = self.opts.gui.device_manager.device
         storage = self.get_storage()
@@ -131,7 +137,7 @@ class SonyReaderApp(USBReader):
             print('adding annotation: ')
             print(row)
             ts = datetime.datetime.fromtimestamp(row[2] / 1e3)
-            dict_of_anns[time.mktime(ts.timetuple())] = {'book_id': row[1],
+            dict_of_anns[time.mktime(ts.timetuple())] = {'book_id': self._device_book_id(row[1]),
                                 'highlight_color': 'Yellow',
                                 'highlight_text': [row[3]],
                                 'note_text': [row[4]],
@@ -247,7 +253,7 @@ class SonyReaderApp(USBReader):
         for row in conn.execute('SELECT _id, author, title FROM books'):
             print('discovered book on device: ')
             print(row)
-            dict_of_books[int(row[0])] = {'author': row[1],
+            dict_of_books[self._device_book_id(row[0])] = {'author': row[1],
                             'title': row[2]}
         conn.close()
 

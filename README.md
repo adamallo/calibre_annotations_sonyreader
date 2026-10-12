@@ -27,3 +27,8 @@ PYTHONDONTWRITEBYTECODE=1 /Applications/calibre.app/Contents/MacOS/calibre-debug
 These tests cover book metadata, Unicode annotations, timestamp ordering, page
 locations, duplicate note suppression, and an empty annotation database. A full
 import through calibre with a connected Sony Reader still requires manual testing.
+
+Sony device book IDs are stored with a `sony:` prefix so the Annotations plugin
+does not mistake them for calibre library IDs. Books are matched through the
+plugin's metadata matching flow, which may ask you to confirm the destination.
+After updating, restart calibre and fetch again to rebuild the cached records.

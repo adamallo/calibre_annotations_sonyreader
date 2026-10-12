@@ -63,11 +63,11 @@ class SonyReaderTests(unittest.TestCase):
         self.fetch('get_installed_books')
         books = {call.args[1].book_id: call.args[1]
                  for call in self.reader.add_to_books_db.call_args_list}
-        self.assertEqual(set(self.reader.installed_books), {2, 7})
-        self.assertEqual(books[7].author, 'José Saramago')
-        self.assertEqual(books[2].title, 'こころ')
-        self.assertEqual(books[2].title_sort, 'こころ')
-        self.assertTrue(books[7].active)
+        self.assertEqual(set(self.reader.installed_books), {'sony:2', 'sony:7'})
+        self.assertEqual(books['sony:7'].author, 'José Saramago')
+        self.assertEqual(books['sony:2'].title, 'こころ')
+        self.assertEqual(books['sony:2'].title_sort, 'こころ')
+        self.assertTrue(books['sony:7'].active)
         self.reader.opts.pb.set_maximum.assert_called_once_with(2)
         self.reader.commit.assert_called_once_with()
 
@@ -80,7 +80,7 @@ class SonyReaderTests(unittest.TestCase):
         self.fetch('get_active_annotations')
         annotations = [call.args[1]
                        for call in self.reader.add_to_annotations_db.call_args_list]
-        self.assertEqual([ann.book_id for ann in annotations], [2, 7])
+        self.assertEqual([ann.book_id for ann in annotations], ['sony:2', 'sony:7'])
         self.assertEqual([ann.location for ann in annotations], ['p. 3', 'p. 12'])
         self.assertEqual(annotations[0].note_text, '')
         self.assertEqual(annotations[1].highlight_text, 'Café — 日本語')
@@ -116,6 +116,28 @@ class SonyReaderTests(unittest.TestCase):
         ])
         self.assertEqual([row[1] for row in rows], ['', 'p. 0', 'p. 3', 'p. 3', 'p. 12'])
         self.assertTrue(all(isinstance(row[2], str) for row in rows))
+
+    def test_device_ids_preserve_book_annotation_association(self):
+        self.conn.execute('INSERT INTO books VALUES (14, ?, ?)', ('Author', 'Title'))
+        self.conn.execute('INSERT INTO annotation VALUES (1, 14, 1600000000000, ?, ?, 3)',
+                          ('Highlight', 'Note'))
+        # Each fetch normally opens a fresh device connection.
+        annotations_db = sqlite3.connect(':memory:')
+        self.addCleanup(annotations_db.close)
+        self.conn.commit()
+        self.conn.backup(annotations_db)
+        self.reader._get_db.side_effect = [self.conn, annotations_db]
+        self.fetch('get_installed_books')
+        self.fetch('get_active_annotations')
+        book = self.reader.add_to_books_db.call_args.args[1]
+        annotation = self.reader.add_to_annotations_db.call_args.args[1]
+        self.assertEqual(book.book_id, 'sony:14')
+        self.assertEqual(annotation.book_id, book.book_id)
+        self.assertEqual(self.reader.installed_books, [book.book_id])
+        self.reader.update_book_last_annotation.assert_called_once_with(
+            'books', annotation.last_modification, book.book_id)
+        with self.assertRaises(ValueError):
+            int(book.book_id)
 
     def test_empty_annotation_database(self):
         self.fetch('get_active_annotations')
